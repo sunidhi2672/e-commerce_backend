@@ -2,6 +2,7 @@ const cors = require("cors");
 const dotenv = require("dotenv");
 const express = require("express");
 const mongoose = require("mongoose");
+dotenv.config();
 
 const app = express();
 
@@ -34,7 +35,7 @@ app.post("/cart/decrease", async (req, res) => {
 
   console.log(productdata);
   const decreaseCart = await productModel.findOneAndUpdate(
-    { productId: productdata.productId },
+    { productIdNumber: productdata.productIdNumber },
     { $set: productdata },
     { returnDocument: "after" },
   );
@@ -47,7 +48,7 @@ app.post("/cart/increase", async (req, res) => {
   const productdata = req.body;
   console.log(productdata);
   const increaseCart = await productModel.findOneAndUpdate(
-    { productId: productdata.productId },
+    { productIdNumber: productdata.productIdNumber },
     { $set: productdata },
     { returnDocument: "after" },
   );
@@ -136,61 +137,117 @@ app.post("/cart/delete", async (req, res) => {
 
 //   // res.send("ok")
 // });
+// app.post("/cart/create", async (req, res) => {
+//   try {
+//     const productdata = req.body;
+
+//     console.log("Frontend se data:", productdata);
+
+//     // Fake Store API ki ID
+//     const productId = productdata.productIdNumber ?? productdata._id;
+
+//     // Check product cart me already hai ya nahi
+//     const existing = await productModel.findOne({
+//       productIdNumber: productId,
+//     });
+
+//     console.log("Existing product:", existing);
+
+//     if (existing) {
+//       // _id ko update nahi karna
+//       const updatedCart = await productModel.findOneAndUpdate(
+//         {
+//           productIdNumber: productId,
+//         },
+//         {
+//           $set: {
+//             title: productdata.title,
+//             isNew: productdata.isNew,
+//             oldPrice: productdata.oldPrice,
+//             price: productdata.price,
+//             discountedPrice: productdata.discountedPrice,
+//             description: productdata.description,
+//             category: productdata.category,
+//             type: productdata.type,
+//             stock: productdata.stock,
+//             brand: productdata.brand,
+//             size: productdata.size,
+//             image: productdata.image,
+//             rating: productdata.rating,
+//             quantity: productdata.quantity,
+//           },
+//         },
+//         {
+//           new: true,
+//         },
+//       );
+
+//       return res.status(200).json({
+//         data: updatedCart,
+//         message: "Cart updated successfully",
+//       });
+//     }
+
+//     // Product cart me nahi hai -> new document
+//     const createdCart = await productModel.create({
+//       productIdNumber: productId,
+
+//       title: productdata.title,
+//       isNew: productdata.isNew,
+//       oldPrice: productdata.oldPrice,
+//       price: productdata.price,
+//       discountedPrice: productdata.discountedPrice,
+//       description: productdata.description,
+//       category: productdata.category,
+//       type: productdata.type,
+//       stock: productdata.stock,
+//       brand: productdata.brand,
+//       size: productdata.size,
+//       image: productdata.image,
+//       rating: productdata.rating,
+//       quantity: productdata.quantity || 1,
+//     });
+
+//     return res.status(201).json({
+//       data: createdCart,
+//       message: "Product added to cart successfully",
+//     });
+//   } catch (error) {
+//     console.log("CREATE CART ERROR:", error);
+
+//     return res.status(500).json({
+//       message: error.message,
+//     });
+//   }
+// });
 app.post("/cart/create", async (req, res) => {
   try {
     const productdata = req.body;
 
-    console.log("Frontend se data:", productdata);
+    console.log("Frontend data:", productdata);
 
-    // Fake Store API ki ID
-    const productId = productdata.productIdNumber ?? productdata._id;
+    const productId = productdata.productIdNumber || productdata._id;
 
-    // Check product cart me already hai ya nahi
+    // Check existing product
     const existing = await productModel.findOne({
       productIdNumber: productId,
     });
 
-    console.log("Existing product:", existing);
-
     if (existing) {
-      // _id ko update nahi karna
-      const updatedCart = await productModel.findOneAndUpdate(
-        {
-          productIdNumber: productId,
-        },
-        {
-          $set: {
-            title: productdata.title,
-            isNew: productdata.isNew,
-            oldPrice: productdata.oldPrice,
-            price: productdata.price,
-            discountedPrice: productdata.discountedPrice,
-            description: productdata.description,
-            category: productdata.category,
-            type: productdata.type,
-            stock: productdata.stock,
-            brand: productdata.brand,
-            size: productdata.size,
-            image: productdata.image,
-            rating: productdata.rating,
-            quantity: productdata.quantity,
-          },
-        },
-        {
-          new: true,
-        },
-      );
+      // Increase quantity
+      existing.quantity = (existing.quantity || 0) + 1;
+
+      await existing.save();
 
       return res.status(200).json({
-        data: updatedCart,
-        message: "Cart updated successfully",
+        message: "Product quantity increased",
+        data: existing,
       });
     }
 
-    // Product cart me nahi hai -> new document
+    // Add new product
     const createdCart = await productModel.create({
       productIdNumber: productId,
-
       title: productdata.title,
       isNew: productdata.isNew,
       oldPrice: productdata.oldPrice,
@@ -204,30 +261,30 @@ app.post("/cart/create", async (req, res) => {
       size: productdata.size,
       image: productdata.image,
       rating: productdata.rating,
-      quantity: productdata.quantity || 1,
+      quantity: 1,
     });
 
-    return res.status(201).json({
+    res.status(201).json({
+      message: "Product added successfully",
       data: createdCart,
-      message: "Product added to cart successfully",
     });
-  } catch (error) {
-    console.log("CREATE CART ERROR:", error);
 
-    return res.status(500).json({
+  } catch (error) {
+    console.log("Cart Error:", error);
+
+    res.status(500).json({
       message: error.message,
     });
   }
 });
-
-const PORT = 5000;
+const PORT = process.env.PORT;
 
 app.listen(PORT, () => {
   console.log("server connected to port " + PORT);
 });
 
 mongoose
-  .connect("mongodb://localhost:27017/nidhi")
+  .connect(`${process.env.MONGODB_URI}`)
   .then(() => {
     console.log("DB connected");
   })
